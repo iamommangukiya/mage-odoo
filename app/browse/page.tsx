@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,81 +12,9 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Search, MapPin, Clock, Eye, MessageSquare } from "lucide-react"
 import { SwapRequestModal } from "@/components/swap-request-modal"
-
-const mockUsers = [
-  {
-    id: 1,
-    name: "Sarah Chen",
-    location: "San Francisco, CA",
-    avatar: "/images/avatars/sarah-chen.jpg",
-    skillsOffered: ["React", "TypeScript", "Node.js"],
-    skillsWanted: ["Python", "Machine Learning"],
-    availability: "weekends",
-    rating: 4.9,
-    swaps: 12,
-    bio: "Full-stack developer with 5 years of experience. Love teaching React and learning ML.",
-  },
-  {
-    id: 2,
-    name: "Marcus Johnson",
-    location: "New York, NY",
-    avatar: "/images/avatars/marcus-johnson.jpg",
-    skillsOffered: ["Python", "Data Science", "SQL"],
-    skillsWanted: ["React", "Frontend"],
-    availability: "weeknights",
-    rating: 4.8,
-    swaps: 8,
-    bio: "Data scientist passionate about sharing knowledge and learning web development.",
-  },
-  {
-    id: 3,
-    name: "Elena Rodriguez",
-    location: "Austin, TX",
-    avatar: "/images/avatars/elena-rodriguez.jpg",
-    skillsOffered: ["UI/UX Design", "Figma", "Prototyping"],
-    skillsWanted: ["Vue.js", "CSS"],
-    availability: "flexible",
-    rating: 5.0,
-    swaps: 15,
-    bio: "UX designer with a passion for creating beautiful and functional interfaces.",
-  },
-  {
-    id: 4,
-    name: "David Kim",
-    location: "Seattle, WA",
-    avatar: "/images/avatars/david-kim.jpg",
-    skillsOffered: ["Go", "Docker", "Kubernetes"],
-    skillsWanted: ["React Native", "Mobile"],
-    availability: "weekends",
-    rating: 4.7,
-    swaps: 6,
-    bio: "DevOps engineer interested in mobile development and cloud technologies.",
-  },
-  {
-    id: 5,
-    name: "Lisa Wang",
-    location: "Los Angeles, CA",
-    avatar: "/images/avatars/lisa-wang.jpg",
-    skillsOffered: ["Photography", "Video Editing", "Adobe Creative"],
-    skillsWanted: ["Web Development", "JavaScript"],
-    availability: "weeknights",
-    rating: 4.9,
-    swaps: 10,
-    bio: "Creative professional looking to transition into tech. Love visual storytelling.",
-  },
-  {
-    id: 6,
-    name: "Alex Thompson",
-    location: "Chicago, IL",
-    avatar: "/images/avatars/alex-thompson.jpg",
-    skillsOffered: ["Java", "Spring Boot", "Microservices"],
-    skillsWanted: ["React", "Modern Frontend"],
-    availability: "flexible",
-    rating: 4.6,
-    swaps: 4,
-    bio: "Backend developer with enterprise experience, eager to learn modern frontend.",
-  },
-]
+import { useFirebaseUser } from '@/hooks/useFirebaseUser'
+import LoginPromptModal from '@/components/LoginPromptModal'
+import { useToast } from '@/hooks/use-toast'
 
 const availableSkills = [
   "React",
@@ -119,27 +47,73 @@ export default function BrowsePage() {
   const [skillOfferedFilter, setSkillOfferedFilter] = useState("All Skills Offered")
   const [skillWantedFilter, setSkillWantedFilter] = useState("All Skills Wanted")
   const [availabilityFilter, setAvailabilityFilter] = useState("All Availability")
-  const [selectedUser, setSelectedUser] = useState<(typeof mockUsers)[0] | null>(null)
+  const [selectedUser, setSelectedUser] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const { user } = useFirebaseUser()
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const [users, setUsers] = useState<any[]>([]);
+  const { toast } = useToast();
 
-  const filteredUsers = mockUsers.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.skillsOffered.some((skill) => skill.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      user.skillsWanted.some((skill) => skill.toLowerCase().includes(searchTerm.toLowerCase()))
+  useEffect(() => {
+    fetch('/api/user/all')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setUsers(data);
+      });
+  }, []);
 
-    const matchesOffered =
-      skillOfferedFilter === "All Skills Offered" || user.skillsOffered.includes(skillOfferedFilter)
-    const matchesWanted = skillWantedFilter === "All Skills Wanted" || user.skillsWanted.includes(skillWantedFilter)
-    const matchesAvailability = availabilityFilter === "All Availability" || user.availability === availabilityFilter
+  const filteredUsers = users
+    .filter((u) => u.email !== user?.email)
+    .filter((user) => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.skills_offered || []).some((skill: string) => skill.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (user.skills_wanted || []).some((skill: string) => skill.toLowerCase().includes(searchTerm.toLowerCase()))
 
-    return matchesSearch && matchesOffered && matchesWanted && matchesAvailability
-  })
+      const matchesOffered =
+        skillOfferedFilter === "All Skills Offered" || (user.skills_offered || []).includes(skillOfferedFilter)
+      const matchesWanted = skillWantedFilter === "All Skills Wanted" || (user.skills_wanted || []).includes(skillWantedFilter)
+      const matchesAvailability = availabilityFilter === "All Availability" || user.availability === availabilityFilter
 
-  const handleRequestSwap = (user: (typeof mockUsers)[0]) => {
-    setSelectedUser(user)
+      return matchesSearch && matchesOffered && matchesWanted && matchesAvailability
+    })
+
+  const handleRequestSwap = (userToSwap: any) => {
+    if (!user) {
+      setShowLoginPrompt(true)
+      return
+    }
+    setSelectedUser(userToSwap)
     setIsModalOpen(true)
   }
+
+  const handleSendSwapRequest = async (targetUser, myOfferedSkill, wantedSkill, message) => {
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+    try {
+      const res = await fetch('/api/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_user_email: user.email,
+          to_user_email: targetUser.email,
+          offered_skill: myOfferedSkill,
+          wanted_skill: wantedSkill,
+          message,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: 'Swap request sent!', description: 'Your request has been sent.' });
+        setIsModalOpen(false);
+      } else {
+        toast({ title: 'Error', description: 'Failed to send swap request.', variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to send swap request.', variant: 'destructive' });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,11 +198,11 @@ export default function BrowsePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredUsers.map((user) => (
-                <Card key={user.id} className="hover:shadow-lg transition-shadow animate-fade-in">
+                <Card key={user._id} className="hover:shadow-lg transition-shadow animate-fade-in">
                   <CardHeader className="pb-4">
                     <div className="flex items-start space-x-4">
                       <Avatar className="h-16 w-16">
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} className="object-cover" />
+                        <AvatarImage src={user.photo_url || "/placeholder.svg"} alt={user.name} className="object-cover" />
                         <AvatarFallback>
                           {user.name
                             .split(" ")
@@ -261,7 +235,7 @@ export default function BrowsePage() {
                       <div>
                         <p className="text-sm font-medium mb-2">Skills Offered:</p>
                         <div className="flex flex-wrap gap-1">
-                          {user.skillsOffered.map((skill) => (
+                          {(user.skills_offered || []).map((skill: string) => (
                             <Badge key={skill} variant="secondary" className="text-xs">
                               {skill}
                             </Badge>
@@ -272,7 +246,7 @@ export default function BrowsePage() {
                       <div>
                         <p className="text-sm font-medium mb-2">Skills Wanted:</p>
                         <div className="flex flex-wrap gap-1">
-                          {user.skillsWanted.map((skill) => (
+                          {(user.skills_wanted || []).map((skill: string) => (
                             <Badge key={skill} variant="outline" className="text-xs">
                               {skill}
                             </Badge>
@@ -282,13 +256,13 @@ export default function BrowsePage() {
                     </div>
 
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>⭐ {user.rating}</span>
-                      <span>{user.swaps} swaps completed</span>
+                      <span>⭐ {user.rating || 0}</span>
+                      <span>{user.completed_swaps || 0} swaps completed</span>
                     </div>
 
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" size="sm" asChild className="flex-1 bg-transparent">
-                        <Link href={`/profile/${user.id}`}>
+                        <Link href={`/profile/${user._id}`}>
                           <Eye className="h-4 w-4 mr-1" />
                           View Profile
                         </Link>
@@ -320,7 +294,8 @@ export default function BrowsePage() {
 
       <Footer />
 
-      <SwapRequestModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} targetUser={selectedUser} />
+      <SwapRequestModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} targetUser={selectedUser} onSend={handleSendSwapRequest} />
+      <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
     </div>
   )
 }

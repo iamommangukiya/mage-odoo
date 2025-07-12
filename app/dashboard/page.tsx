@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -9,126 +9,133 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-import { Check, X, Clock, ArrowRight, MessageSquare } from "lucide-react"
+import { Check, X, Clock, ArrowRight, MessageSquare, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-
-const mockSentRequests = [
-  {
-    id: 1,
-    targetUser: {
-      name: "Sarah Chen",
-      avatar: "/placeholder.svg?height=48&width=48",
-    },
-    mySkill: "React",
-    wantedSkill: "Python",
-    message: "Hi Sarah! I'd love to learn Python from you while teaching React...",
-    status: "pending",
-    dateSent: "2024-01-15",
-    dateUpdated: "2024-01-15",
-  },
-  {
-    id: 2,
-    targetUser: {
-      name: "Marcus Johnson",
-      avatar: "/placeholder.svg?height=48&width=48",
-    },
-    mySkill: "TypeScript",
-    wantedSkill: "Data Science",
-    message: "Hello Marcus! I'm interested in learning data science...",
-    status: "accepted",
-    dateSent: "2024-01-12",
-    dateUpdated: "2024-01-14",
-  },
-  {
-    id: 3,
-    targetUser: {
-      name: "Elena Rodriguez",
-      avatar: "/placeholder.svg?height=48&width=48",
-    },
-    mySkill: "Node.js",
-    wantedSkill: "UI/UX Design",
-    message: "Hi Elena! I'm a backend developer looking to improve my design skills...",
-    status: "rejected",
-    dateSent: "2024-01-10",
-    dateUpdated: "2024-01-11",
-  },
-]
-
-const mockReceivedRequests = [
-  {
-    id: 4,
-    fromUser: {
-      name: "David Kim",
-      avatar: "/placeholder.svg?height=48&width=48",
-    },
-    theirSkill: "Go",
-    wantedSkill: "React",
-    message:
-      "Hi! I'm a Go developer interested in learning React. I have 3 years of experience with Go and would love to share my knowledge...",
-    status: "pending",
-    dateSent: "2024-01-16",
-    dateUpdated: "2024-01-16",
-  },
-  {
-    id: 5,
-    fromUser: {
-      name: "Lisa Wang",
-      avatar: "/placeholder.svg?height=48&width=48",
-    },
-    theirSkill: "Photography",
-    wantedSkill: "JavaScript",
-    message: "Hello! I'm a professional photographer looking to transition into web development...",
-    status: "pending",
-    dateSent: "2024-01-14",
-    dateUpdated: "2024-01-14",
-  },
-  {
-    id: 6,
-    fromUser: {
-      name: "Alex Thompson",
-      avatar: "/placeholder.svg?height=48&width=48",
-    },
-    theirSkill: "Java",
-    wantedSkill: "React",
-    message: "Hi there! I'm a Java developer with enterprise experience...",
-    status: "accepted",
-    dateSent: "2024-01-08",
-    dateUpdated: "2024-01-09",
-  },
-]
+import { useFirebaseUser } from '@/hooks/useFirebaseUser'
+import LoginPromptModal from '@/components/LoginPromptModal'
 
 export default function DashboardPage() {
-  const [sentRequests, setSentRequests] = useState(mockSentRequests)
-  const [receivedRequests, setReceivedRequests] = useState(mockReceivedRequests)
+  const [swaps, setSwaps] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState("all")
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const { toast } = useToast()
+  const { user } = useFirebaseUser()
 
-  const handleAcceptRequest = (requestId: number) => {
-    setReceivedRequests((prev) =>
-      prev.map((req) =>
-        req.id === requestId
-          ? { ...req, status: "accepted", dateUpdated: new Date().toISOString().split("T")[0] }
-          : req,
-      ),
-    )
-    toast({
-      title: "Request accepted!",
-      description: "You can now start your skill swap session.",
-    })
+  // Fetch swaps when user changes
+  useEffect(() => {
+    if (user?.email) {
+      fetchSwaps()
+    } else if (!user) {
+      setLoading(false)
+    }
+  }, [user?.email])
+
+  const fetchSwaps = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/swap/user/${encodeURIComponent(user!.email)}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch swaps')
+      }
+
+      const data = await response.json()
+      setSwaps(data)
+    } catch (error) {
+      console.error('Error fetching swaps:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load your swaps. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleRejectRequest = (requestId: number) => {
-    setReceivedRequests((prev) =>
-      prev.map((req) =>
-        req.id === requestId
-          ? { ...req, status: "rejected", dateUpdated: new Date().toISOString().split("T")[0] }
-          : req,
-      ),
-    )
-    toast({
-      title: "Request rejected",
-      description: "The request has been declined.",
-    })
+  const handleAcceptRequest = async (swapId: string) => {
+    if (!user) {
+      setShowLoginPrompt(true)
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/swap/${swapId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'accepted',
+          user_email: user.email
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Request accepted!",
+          description: "You can now start your skill swap session.",
+        })
+        // Refresh swaps
+        fetchSwaps()
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.error || "Failed to accept request.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to accept request. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleRejectRequest = async (swapId: string) => {
+    if (!user) {
+      setShowLoginPrompt(true)
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/swap/${swapId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'rejected',
+          user_email: user.email
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Request rejected",
+          description: "The request has been declined.",
+        })
+        // Refresh swaps
+        fetchSwaps()
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.error || "Failed to reject request.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reject request. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -159,11 +166,49 @@ export default function DashboardPage() {
     }
   }
 
+  // Filter swaps based on type and status
+  const sentRequests = swaps.filter(swap => swap.type === 'sent')
+  const receivedRequests = swaps.filter(swap => swap.type === 'received')
+
   const filteredSentRequests =
     statusFilter === "all" ? sentRequests : sentRequests.filter((req) => req.status === statusFilter)
 
   const filteredReceivedRequests =
     statusFilter === "all" ? receivedRequests : receivedRequests.filter((req) => req.status === statusFilter)
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-semibold">Login Required</h2>
+            <p className="text-muted-foreground">Please log in to view your dashboard.</p>
+            <Button onClick={() => setShowLoginPrompt(true)}>
+              Login
+            </Button>
+          </div>
+        </div>
+        <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
+      </div>
+    )
+  }
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading your dashboard...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -194,7 +239,7 @@ export default function DashboardPage() {
             <Card>
               <CardContent className="p-6">
                 <div className="text-2xl font-bold">
-                  {[...sentRequests, ...receivedRequests].filter((req) => req.status === "accepted").length}
+                  {swaps.filter((req) => req.status === "accepted").length}
                 </div>
                 <p className="text-xs text-muted-foreground">Active Swaps</p>
               </CardContent>
@@ -202,7 +247,7 @@ export default function DashboardPage() {
             <Card>
               <CardContent className="p-6">
                 <div className="text-2xl font-bold">
-                  {[...sentRequests, ...receivedRequests].filter((req) => req.status === "pending").length}
+                  {swaps.filter((req) => req.status === "pending").length}
                 </div>
                 <p className="text-xs text-muted-foreground">Pending</p>
               </CardContent>
@@ -257,21 +302,24 @@ export default function DashboardPage() {
                       <CardContent className="p-6">
                         <div className="flex items-start space-x-4">
                           <Avatar className="h-12 w-12">
-                            <AvatarImage src={request.fromUser.avatar || "/placeholder.svg"} />
+                            <AvatarImage 
+                              src={request.fromUser?.avatar || "/placeholder-user.jpg"} 
+                              alt={request.fromUser?.name || "User"}
+                            />
                             <AvatarFallback>
-                              {request.fromUser.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
+                              {request.fromUser?.name
+                                ?.split(" ")
+                                .map((n: string) => n[0])
+                                .join("") || "U"}
                             </AvatarFallback>
                           </Avatar>
 
                           <div className="flex-1 space-y-3">
                             <div className="flex items-center justify-between">
                               <div>
-                                <h3 className="font-semibold">{request.fromUser.name}</h3>
+                                <h3 className="font-semibold">{request.fromUser?.name || "Unknown User"}</h3>
                                 <p className="text-sm text-muted-foreground">
-                                  Sent {new Date(request.dateSent).toLocaleDateString()}
+                                  Sent {new Date(request.created_at).toLocaleDateString()}
                                 </p>
                               </div>
                               {getStatusBadge(request.status)}
@@ -336,23 +384,26 @@ export default function DashboardPage() {
                       <CardContent className="p-6">
                         <div className="flex items-start space-x-4">
                           <Avatar className="h-12 w-12">
-                            <AvatarImage src={request.targetUser.avatar || "/placeholder.svg"} />
+                            <AvatarImage 
+                              src={request.targetUser?.avatar || "/placeholder-user.jpg"} 
+                              alt={request.targetUser?.name || "User"}
+                            />
                             <AvatarFallback>
-                              {request.targetUser.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
+                              {request.targetUser?.name
+                                ?.split(" ")
+                                .map((n: string) => n[0])
+                                .join("") || "U"}
                             </AvatarFallback>
                           </Avatar>
 
                           <div className="flex-1 space-y-3">
                             <div className="flex items-center justify-between">
                               <div>
-                                <h3 className="font-semibold">{request.targetUser.name}</h3>
+                                <h3 className="font-semibold">{request.targetUser?.name || "Unknown User"}</h3>
                                 <p className="text-sm text-muted-foreground">
-                                  Sent {new Date(request.dateSent).toLocaleDateString()}
-                                  {request.dateUpdated !== request.dateSent && (
-                                    <span> • Updated {new Date(request.dateUpdated).toLocaleDateString()}</span>
+                                  Sent {new Date(request.created_at).toLocaleDateString()}
+                                  {request.updated_at && request.updated_at !== request.created_at && (
+                                    <span> • Updated {new Date(request.updated_at).toLocaleDateString()}</span>
                                   )}
                                 </p>
                               </div>
@@ -381,6 +432,7 @@ export default function DashboardPage() {
       </div>
 
       <Footer />
+      <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
     </div>
   )
 }

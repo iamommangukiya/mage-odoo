@@ -12,6 +12,9 @@ import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Github, Mail } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -23,6 +26,8 @@ export default function SignupPage() {
     agreeToTerms: false,
   })
   const { toast } = useToast()
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,15 +51,33 @@ export default function SignupPage() {
     }
 
     setIsLoading(true)
+    setError('');
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      // Create user in Firebase
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      await updateProfile(userCredential.user, { displayName: formData.name });
+      // Upsert user in MongoDB
+      await fetch('/api/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          photo_url: userCredential.user.photoURL,
+        }),
+      });
       toast({
         title: "Account created!",
         description: "Welcome to SkillSwap. Please check your email to verify your account.",
       })
-    }, 1000)
+      router.push('/login');
+      // Optionally redirect
+    } catch (err: any) {
+      setError(err.message || 'Signup failed');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const handleSocialSignup = (provider: string) => {
@@ -82,6 +105,7 @@ export default function SignupPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>

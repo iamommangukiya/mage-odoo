@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +15,7 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Camera, X, Plus, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useFirebaseUser } from '@/hooks/useFirebaseUser'
 
 const availableSkills = [
   "React",
@@ -45,27 +46,97 @@ const availableSkills = [
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
   const [profileData, setProfileData] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    location: "San Francisco, CA",
-    bio: "Passionate full-stack developer with 5 years of experience. Love learning new technologies and sharing knowledge with others.",
-    availability: "weekends",
+    name: '',
+    email: '',
+    location: '',
+    bio: '',
+    availability: '',
     isPublic: true,
-    skillsOffered: ["React", "Node.js", "TypeScript"],
-    skillsWanted: ["Python", "Machine Learning", "Go"],
-    avatar: "/images/avatars/john-doe.jpg",
+    skillsOffered: [],
+    skillsWanted: [],
+    avatar: '',
   })
   const [newSkillOffered, setNewSkillOffered] = useState("")
   const [newSkillWanted, setNewSkillWanted] = useState("")
   const { toast } = useToast()
+  const { user } = useFirebaseUser();
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSave = () => {
-    setIsEditing(false)
+  // Fetch profile on mount
+  useEffect(() => {
+    if (user?.email) {
+      fetch(`/api/user?email=${encodeURIComponent(user.email)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && !data.error) {
+            setProfileData({
+              name: data.name || '',
+              email: data.email || '',
+              location: data.location || '',
+              bio: data.bio || '',
+              availability: data.availability || '',
+              isPublic: data.is_public !== undefined ? data.is_public : true,
+              skillsOffered: data.skills_offered || [],
+              skillsWanted: data.skills_wanted || [],
+              avatar: data.photo_url || '',
+            });
+          }
+        });
+    }
+  }, [user?.email]);
+
+  // Save profile to backend
+  const handleSave = async () => {
+    setLoading(true);
+    let photo_url = profileData.avatar;
+    // If avatarFile is set, upload it
+    if (avatarFile) {
+      const formData = new FormData();
+      formData.append('file', avatarFile);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.secure_url) {
+        photo_url = data.secure_url;
+      }
+    }
+    // Save profile
+    await fetch('/api/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: profileData.name,
+        email: profileData.email,
+        location: profileData.location,
+        bio: profileData.bio,
+        availability: profileData.availability,
+        is_public: profileData.isPublic,
+        skills_offered: profileData.skillsOffered,
+        skills_wanted: profileData.skillsWanted,
+        photo_url,
+      }),
+    });
+    setProfileData(prev => ({ ...prev, avatar: photo_url }));
+    setAvatarFile(null);
+    setIsEditing(false);
+    setLoading(false);
     toast({
-      title: "Profile updated!",
-      description: "Your changes have been saved successfully.",
-    })
-  }
+      title: 'Profile updated!',
+      description: 'Your changes have been saved successfully.',
+    });
+  };
+
+  // Handle avatar file change
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setAvatarFile(e.target.files[0]);
+      // Show preview
+      setProfileData(prev => ({ ...prev, avatar: URL.createObjectURL(e.target.files[0]) }));
+    }
+  };
 
   const addSkill = (type: "offered" | "wanted", skill: string) => {
     if (!skill) return
@@ -134,9 +205,19 @@ export default function ProfilePage() {
                       <AvatarFallback className="text-2xl">JD</AvatarFallback>
                     </Avatar>
                     {isEditing && (
-                      <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 rounded-full">
-                        <Camera className="h-4 w-4" />
-                      </Button>
+                      <label className="absolute bottom-0 right-0 rounded-full cursor-pointer">
+                        <Button size="icon" variant="secondary" asChild>
+                          <span>
+                            <Camera className="h-4 w-4" />
+                          </span>
+                        </Button>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
                     )}
                   </div>
                   <div className="space-y-2">

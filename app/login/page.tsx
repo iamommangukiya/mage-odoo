@@ -11,25 +11,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { Github, Mail } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const { toast } = useToast()
+  const [error, setError] = useState('')
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError('')
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
       toast({
         title: "Login successful!",
         description: "Welcome back to SkillSwap.",
       })
-    }, 1000)
+      router.push('/browse')
+      // Optionally redirect
+    } catch (err: any) {
+      setError(err.message || 'Login failed')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSocialLogin = (provider: string) => {
@@ -37,6 +48,27 @@ export default function LoginPage() {
       title: `${provider} login`,
       description: `Redirecting to ${provider}...`,
     })
+  }
+
+  const handleGoogleLogin = async () => {
+    const provider = new GoogleAuthProvider()
+    try {
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+      // Send user info to backend
+      await fetch('/api/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: user.displayName,
+          email: user.email,
+          photo_url: user.photoURL,
+        }),
+      })
+      console.log('Google user synced to backend:', user.email)
+    } catch (error) {
+      console.error('Google login error:', error)
+    }
   }
 
   return (
@@ -53,6 +85,7 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -99,7 +132,7 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" onClick={() => handleSocialLogin("Google")} className="w-full">
+            <Button variant="outline" onClick={handleGoogleLogin} className="w-full">
               <Mail className="mr-2 h-4 w-4" />
               Google
             </Button>

@@ -20,13 +20,15 @@ interface SwapRequestModalProps {
   targetUser: {
     id: number
     name: string
+    email?: string
     avatar: string
     skillsOffered: string[]
     skillsWanted: string[]
   } | null
+  onSend?: (targetUser: any, myOfferedSkill: string, wantedSkill: string, message: string) => Promise<void>
 }
 
-export function SwapRequestModal({ isOpen, onClose, targetUser }: SwapRequestModalProps) {
+export function SwapRequestModal({ isOpen, onClose, targetUser, onSend }: SwapRequestModalProps) {
   const [myOfferedSkill, setMyOfferedSkill] = useState("")
   const [wantedSkill, setWantedSkill] = useState("")
   const [message, setMessage] = useState("")
@@ -47,26 +49,24 @@ export function SwapRequestModal({ isOpen, onClose, targetUser }: SwapRequestMod
 
     setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
+    if (onSend) {
+      await onSend(targetUser, myOfferedSkill, wantedSkill, message)
       setIsLoading(false)
-      toast({
-        title: "Request sent!",
-        description: `Your swap request has been sent to ${targetUser?.name}.`,
-      })
-
-      // Reset form
       setMyOfferedSkill("")
       setWantedSkill("")
       setMessage("")
       onClose()
-    }, 1000)
+      return
+    }
+    setIsLoading(false)
   }
 
   if (!targetUser) return null
 
   // Find skills that match between what I offer and what they want
-  const matchingSkillsICanOffer = mySkills.filter((skill) => targetUser.skillsWanted.includes(skill))
+  const matchingSkillsICanOffer = mySkills.filter((skill) =>
+    (targetUser.skillsWanted || targetUser.skills_wanted || []).includes(skill)
+  )
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -91,7 +91,7 @@ export function SwapRequestModal({ isOpen, onClose, targetUser }: SwapRequestMod
             <div>
               <h3 className="font-semibold">{targetUser.name}</h3>
               <div className="flex flex-wrap gap-1 mt-1">
-                {targetUser.skillsOffered.slice(0, 3).map((skill) => (
+                {(targetUser.skillsOffered || targetUser.skills_offered || []).slice(0, 3).map((skill) => (
                   <Badge key={skill} variant="secondary" className="text-xs">
                     {skill}
                   </Badge>
@@ -139,7 +139,7 @@ export function SwapRequestModal({ isOpen, onClose, targetUser }: SwapRequestMod
                   <SelectValue placeholder="Select a skill you want to learn" />
                 </SelectTrigger>
                 <SelectContent>
-                  {targetUser.skillsOffered.map((skill) => (
+                  {(targetUser.skillsOffered || targetUser.skills_offered || []).map((skill) => (
                     <SelectItem key={skill} value={skill}>
                       {skill}
                     </SelectItem>

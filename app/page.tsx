@@ -10,6 +10,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ArrowRight, Users, Zap, Shield, ChevronLeft, ChevronRight } from "lucide-react"
+import { useRouter } from 'next/navigation';
+
+
 
 const featuredProfiles = [
   {

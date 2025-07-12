@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Bell, Menu, Moon, Sun, User, LogOut, Settings, MessageSquare } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { useFirebaseUser } from '@/hooks/useFirebaseUser';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { NotificationDropdown } from './NotificationDropdown';
 
 const notifications = [
   {
@@ -39,8 +43,22 @@ const notifications = [
 
 export function Navbar() {
   const { theme, setTheme } = useTheme()
-  const [isLoggedIn, setIsLoggedIn] = useState(true) // Mock login state
+  const { user } = useFirebaseUser();
+  const isLoggedIn = !!user;
+  const [profile, setProfile] = useState<{ photo_url?: string } | null>(null);
   const unreadCount = notifications.filter((n) => n.unread).length
+
+  useEffect(() => {
+    if (user?.email) {
+      fetch(`/api/user?email=${encodeURIComponent(user.email)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && !data.error) setProfile(data);
+        });
+    }
+  }, [user?.email]);
+
+  const avatarUrl = profile?.photo_url || user?.photoURL || '/placeholder.svg';
 
   const NavLinks = () => (
     <>
@@ -65,8 +83,8 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className=" flex h-16 items-center p-[15px] justify-between">
-        <div className="flex items-center justify-center space-x-8">
+      <div className="px-7 flex h-16 items-center justify-between">
+        <div className="flex items-center space-x-8">
           <Link href="/" className="flex items-center space-x-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">SS</span>
@@ -96,40 +114,15 @@ export function Navbar() {
               </Button>
 
               {/* Notification Bell */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-4 w-4" />
-                    {unreadCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                        {unreadCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <div className="p-2">
-                    <h4 className="font-semibold mb-2">Notifications</h4>
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`p-2 rounded-lg mb-2 ${notification.unread ? "bg-muted" : ""}`}
-                      >
-                        <p className="text-sm">{notification.message}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{notification.time}</p>
-                      </div>
-                    ))}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <NotificationDropdown />
 
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src="/images/avatars/john-doe.jpg" alt="User" />
-                      <AvatarFallback>JD</AvatarFallback>
+                      <AvatarImage src={avatarUrl} alt="User" />
+                      <AvatarFallback>{user.displayName ? user.displayName.split(' ').map(n => n[0]).join('') : 'U'}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
@@ -145,7 +138,7 @@ export function Navbar() {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setIsLoggedIn(false)}>
+                  <DropdownMenuItem onClick={() => signOut(auth)}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out
                   </DropdownMenuItem>

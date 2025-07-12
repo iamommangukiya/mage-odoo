@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, use } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -9,64 +9,90 @@ import { Separator } from "@/components/ui/separator"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { SwapRequestModal } from "@/components/swap-request-modal"
-import { MapPin, Clock, Star, Users, MessageSquare, ArrowLeft } from "lucide-react"
+import { AddReviewModal } from "@/components/AddReviewModal"
+import { MapPin, Clock, Star, Users, MessageSquare, ArrowLeft, Loader2, Plus } from "lucide-react"
 import Link from "next/link"
+import { useFirebaseUser } from '@/hooks/useFirebaseUser'
 
-// Mock user data - in real app this would come from API based on ID
-const mockUser = {
-  id: 1,
-  name: "Sarah Chen",
-  location: "San Francisco, CA",
-  avatar: "/images/avatars/sarah-chen.jpg",
-  bio: "Full-stack developer with 5 years of experience in React, Node.js, and cloud technologies. I'm passionate about teaching and learning new skills. I love helping others get started with modern web development while expanding my own knowledge in data science and machine learning.",
-  skillsOffered: ["React", "TypeScript", "Node.js", "AWS", "Docker"],
-  skillsWanted: ["Python", "Machine Learning", "Data Science", "TensorFlow"],
-  availability: "weekends",
-  rating: 4.9,
-  totalSwaps: 12,
-  completedSwaps: 10,
-  joinedDate: "2023-06-15",
-  isPublic: true,
-  reviews: [
-    {
-      id: 1,
-      reviewer: "Marcus Johnson",
-      reviewerAvatar: "/images/avatars/marcus-johnson.jpg",
-      rating: 5,
-      comment: "Sarah is an excellent teacher! She helped me understand React hooks in just a few sessions.",
-      date: "2024-01-10",
-      skillTaught: "React",
-    },
-    {
-      id: 2,
-      reviewer: "Elena Rodriguez",
-      reviewerAvatar: "/images/avatars/elena-rodriguez.jpg",
-      rating: 5,
-      comment: "Very patient and knowledgeable. Great at explaining complex concepts simply.",
-      date: "2024-01-05",
-      skillTaught: "TypeScript",
-    },
-    {
-      id: 3,
-      reviewer: "David Kim",
-      reviewerAvatar: "/images/avatars/david-kim.jpg",
-      rating: 4,
-      comment: "Good experience overall. Sarah knows her stuff and is very helpful.",
-      date: "2023-12-20",
-      skillTaught: "Node.js",
-    },
-  ],
-}
-
-// Mock current user skills for matching
-const mySkills = ["Python", "Machine Learning", "JavaScript", "React"]
-
-export default function UserProfilePage({ params }: { params: { id: string } }) {
+export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+  const [userData, setUserData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { user: currentUser } = useFirebaseUser()
+
+  // Mock current user skills for matching - in real app this would come from current user's profile
+  const mySkills = ["Python", "Machine Learning", "JavaScript", "React"]
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/user/${id}`)
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('User not found')
+          } else {
+            setError('Failed to load user profile')
+          }
+          return
+        }
+
+        const data = await response.json()
+        setUserData(data)
+      } catch (err) {
+        setError('Failed to load user profile')
+        console.error('Error fetching user:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (id) {
+      fetchUserData()
+    }
+  }, [id])
 
   // Find matching skills
-  const matchingSkills = mockUser.skillsWanted.filter((skill) => mySkills.includes(skill))
-  const skillsICanLearn = mockUser.skillsOffered.filter((skill) => !mySkills.includes(skill))
+  const matchingSkills = userData?.skills_wanted?.filter((skill: string) => mySkills.includes(skill)) || []
+  const skillsICanLearn = userData?.skills_offered?.filter((skill: string) => !mySkills.includes(skill)) || []
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading profile...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !userData) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-semibold">Profile Not Found</h2>
+            <p className="text-muted-foreground">{error || 'Unable to load profile'}</p>
+            <Button asChild>
+              <Link href="/browse">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Browse
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,31 +113,33 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
             <CardContent className="p-8">
               <div className="flex flex-col md:flex-row items-start md:items-center space-y-6 md:space-y-0 md:space-x-8">
                 <Avatar className="h-32 w-32 mx-auto md:mx-0">
-                  <AvatarImage src={mockUser.avatar || "/placeholder.svg"} alt={mockUser.name} />
+                  <AvatarImage src={userData.photo_url || "/placeholder.svg"} alt={userData.name} />
                   <AvatarFallback className="text-2xl">
-                    {mockUser.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
+                    {userData.name
+                      ?.split(" ")
+                      .map((n: string) => n[0])
+                      .join("") || "U"}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1 text-center md:text-left space-y-4">
                   <div>
-                    <h1 className="text-3xl font-bold">{mockUser.name}</h1>
+                    <h1 className="text-3xl font-bold">{userData.name}</h1>
                     <div className="flex items-center justify-center md:justify-start space-x-4 mt-2 text-muted-foreground">
                       <div className="flex items-center space-x-1">
                         <MapPin className="h-4 w-4" />
-                        <span>{mockUser.location}</span>
+                        <span>{userData.location || 'Location not specified'}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Clock className="h-4 w-4" />
                         <span>
-                          {mockUser.availability === "weekends"
+                          {userData.availability === "weekends"
                             ? "Weekends"
-                            : mockUser.availability === "weeknights"
+                            : userData.availability === "weeknights"
                               ? "Weeknights"
-                              : "Flexible"}
+                              : userData.availability === "flexible"
+                                ? "Flexible"
+                                : "Not specified"}
                         </span>
                       </div>
                     </div>
@@ -120,16 +148,16 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
                   <div className="flex items-center justify-center md:justify-start space-x-6 text-sm">
                     <div className="flex items-center space-x-1">
                       <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                      <span className="font-semibold">{mockUser.rating}</span>
-                      <span className="text-muted-foreground">({mockUser.reviews.length} reviews)</span>
+                      <span className="font-semibold">{userData.rating || 0}</span>
+                      <span className="text-muted-foreground">({userData.reviews?.length || 0} reviews)</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Users className="h-4 w-4" />
-                      <span>{mockUser.completedSwaps} swaps completed</span>
+                      <span>{userData.completed_swaps || 0} swaps completed</span>
                     </div>
                   </div>
 
-                  <p className="text-muted-foreground max-w-2xl">{mockUser.bio}</p>
+                  <p className="text-muted-foreground max-w-2xl">{userData.bio || 'No bio available'}</p>
 
                   <Button size="lg" onClick={() => setIsModalOpen(true)} className="w-full md:w-auto">
                     <MessageSquare className="h-4 w-4 mr-2" />
@@ -150,11 +178,15 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {mockUser.skillsOffered.map((skill) => (
-                      <Badge key={skill} variant="secondary" className="text-sm py-1 px-3">
-                        {skill}
-                      </Badge>
-                    ))}
+                    {userData.skills_offered?.length > 0 ? (
+                      userData.skills_offered.map((skill: string) => (
+                        <Badge key={skill} variant="secondary" className="text-sm py-1 px-3">
+                          {skill}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">No skills offered yet</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -166,11 +198,15 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {mockUser.skillsWanted.map((skill) => (
-                      <Badge key={skill} variant="outline" className="text-sm py-1 px-3">
-                        {skill}
-                      </Badge>
-                    ))}
+                    {userData.skills_wanted?.length > 0 ? (
+                      userData.skills_wanted.map((skill: string) => (
+                        <Badge key={skill} variant="outline" className="text-sm py-1 px-3">
+                          {skill}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">No skills wanted yet</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -178,51 +214,72 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
               {/* Reviews */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Reviews</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Reviews</CardTitle>
+                    {currentUser && currentUser.uid !== id && (
+                      <Button
+                        size="sm"
+                        onClick={() => setIsReviewModalOpen(true)}
+                        className="flex items-center space-x-1"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Add Review</span>
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {mockUser.reviews.map((review, index) => (
-                    <div key={review.id}>
-                      <div className="space-y-3">
-                        <div className="flex items-start space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={review.reviewerAvatar || "/placeholder.svg"} alt={review.reviewer} />
-                            <AvatarFallback>
-                              {review.reviewer
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-2">
-                                <span className="font-semibold">{review.reviewer}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {review.skillTaught}
-                                </Badge>
+                  {userData.reviews?.length > 0 ? (
+                    userData.reviews.map((review: any, index: number) => (
+                      <div key={review._id || index}>
+                        <div className="space-y-3">
+                          <div className="flex items-start space-x-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage 
+                                src={review.reviewer_avatar && review.reviewer_avatar !== "null" ? review.reviewer_avatar : "/placeholder-user.jpg"} 
+                                alt={review.reviewer_name || "Reviewer"} 
+                              />
+                              <AvatarFallback>
+                                {review.reviewer_name
+                                  ?.split(" ")
+                                  .map((n: string) => n[0])
+                                  .join("") || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-semibold">{review.reviewer_name}</span>
+                                  {review.skill_taught && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {review.skill_taught}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`h-4 w-4 ${
+                                        i < review.rating ? "text-yellow-500 fill-current" : "text-gray-300"
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`h-4 w-4 ${
-                                      i < review.rating ? "text-yellow-500 fill-current" : "text-gray-300"
-                                    }`}
-                                  />
-                                ))}
-                              </div>
+                              <p className="text-sm text-muted-foreground mb-1">{review.comment}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(review.date).toLocaleDateString()}
+                              </p>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-1">{review.comment}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(review.date).toLocaleDateString()}
-                            </p>
                           </div>
                         </div>
+                        {index < userData.reviews.length - 1 && <Separator className="mt-4" />}
                       </div>
-                      {index < mockUser.reviews.length - 1 && <Separator className="mt-4" />}
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">No reviews yet</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -238,7 +295,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
                   <CardContent>
                     <p className="text-sm text-muted-foreground mb-3">You can offer skills they want:</p>
                     <div className="flex flex-wrap gap-2">
-                      {matchingSkills.map((skill) => (
+                      {matchingSkills.map((skill: string) => (
                         <Badge key={skill} className="bg-green-100 text-green-800 border-green-300">
                           {skill}
                         </Badge>
@@ -252,12 +309,13 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
               {skillsICanLearn.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>You Can Learn</CardTitle>
+                    <CardTitle className="text-blue-600">Skills You Can Learn 📚</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    <p className="text-sm text-muted-foreground mb-3">Skills they can teach you:</p>
                     <div className="flex flex-wrap gap-2">
-                      {skillsICanLearn.map((skill) => (
-                        <Badge key={skill} variant="outline">
+                      {skillsICanLearn.map((skill: string) => (
+                        <Badge key={skill} className="bg-blue-100 text-blue-800 border-blue-300">
                           {skill}
                         </Badge>
                       ))}
@@ -275,24 +333,26 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Member since</span>
                     <span className="text-sm font-medium">
-                      {new Date(mockUser.joinedDate).toLocaleDateString("en-US", {
+                      {userData.joined_date ? new Date(userData.joined_date).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "long",
-                      })}
+                      }) : 'Not specified'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Total swaps</span>
-                    <span className="text-sm font-medium">{mockUser.totalSwaps}</span>
+                    <span className="text-sm font-medium">{userData.total_swaps || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Completed swaps</span>
-                    <span className="text-sm font-medium">{mockUser.completedSwaps}</span>
+                    <span className="text-sm font-medium">{userData.completed_swaps || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Success rate</span>
                     <span className="text-sm font-medium">
-                      {Math.round((mockUser.completedSwaps / mockUser.totalSwaps) * 100)}%
+                      {userData.total_swaps > 0 
+                        ? Math.round((userData.completed_swaps / userData.total_swaps) * 100)
+                        : 0}%
                     </span>
                   </div>
                 </CardContent>
@@ -304,7 +364,17 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
 
       <Footer />
 
-      <SwapRequestModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} targetUser={mockUser} />
+      <SwapRequestModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} targetUser={userData} />
+      <AddReviewModal 
+        isOpen={isReviewModalOpen} 
+        onClose={() => setIsReviewModalOpen(false)} 
+        targetUserId={id}
+        targetUserName={userData?.name || 'User'}
+        onReviewAdded={() => {
+          // Refresh user data to show new review
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }
