@@ -12,7 +12,7 @@ const ReviewSchema = new Schema({
 
 const UserSchema = new Schema({
   name: String,
-  email: { type: String, required: true, unique: true },
+  email: { type: String, unique: true },
   photo_url: String,
   location: String,
   skills_offered: [String],

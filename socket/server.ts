@@ -3,6 +3,8 @@ import { Server as HTTPServer } from 'http';
 import dbConnect from '@/lib/db';
 import User from '@/lib/models/User';
 import Notification from '@/lib/models/Notification';
+import Message from '@/lib/models/Message';
+import Swap from '@/lib/models/Swap';
 
 interface UserSocket {
   userId: string;
@@ -53,6 +55,103 @@ class SocketServer {
         } catch (error) {
           console.error('Authentication error:', error);
           socket.emit('authenticated', { success: false, error: 'Authentication failed' });
+        }
+      });
+
+      // Handle joining chat room for a specific swap
+      socket.on('join-chat', async (data: { swapId: string, userEmail: string }) => {
+        try {
+          await dbConnect();
+          const user = await User.findOne({ email: data.userEmail });
+          
+          if (user) {
+            // Verify user has access to this swap
+            const swap = await Swap.findById(data.swapId);
+            if (swap && (swap.from_user_id.toString() === user._id.toString() || 
+                        swap.to_user_id.toString() === user._id.toString()) &&
+                swap.status === 'accepted') {
+              
+              socket.join(`swap_${data.swapId}`);
+              console.log(`User ${user.email} joined chat for swap ${data.swapId}`);
+              socket.emit('joined-chat', { success: true, swapId: data.swapId });
+            } else {
+              socket.emit('joined-chat', { success: false, error: 'Access denied' });
+            }
+          }
+        } catch (error) {
+          console.error('Error joining chat:', error);
+          socket.emit('joined-chat', { success: false, error: 'Failed to join chat' });
+        }
+      });
+
+      // Handle leaving chat room
+      socket.on('leave-chat', (data: { swapId: string }) => {
+        socket.leave(`swap_${data.swapId}`);
+        console.log(`User left chat for swap ${data.swapId}`);
+      });
+
+      // Handle sending chat messages
+      socket.on('send-message', async (data: { 
+        swapId: string, 
+        message: string, 
+        userEmail: string 
+      }) => {
+        try {
+          await dbConnect();
+          const user = await User.findOne({ email: data.userEmail });
+          
+          if (!user) {
+            socket.emit('message-error', { error: 'User not found' });
+            return;
+          }
+
+          // Verify user has access to this swap
+          const swap = await Swap.findById(data.swapId);
+          if (!swap || (swap.from_user_id.toString() !== user._id.toString() && 
+                       swap.to_user_id.toString() !== user._id.toString()) ||
+              swap.status !== 'accepted') {
+            socket.emit('message-error', { error: 'Access denied' });
+            return;
+          }
+
+          // Determine the recipient
+          const recipientId = swap.from_user_id.toString() === user._id.toString() 
+            ? swap.to_user_id 
+            : swap.from_user_id;
+
+          // Save message to database
+          const newMessage = await Message.create({
+            swap_id: data.swapId,
+            from_user_id: user._id,
+            to_user_id: recipientId,
+            message: data.message,
+            created_at: new Date()
+          });
+
+          // Populate user info for the response
+          await newMessage.populate('from_user_id', 'name email photo_url');
+
+          const messageData = {
+            id: newMessage._id,
+            swap_id: newMessage.swap_id,
+            from_user_id: newMessage.from_user_id._id,
+            to_user_id: newMessage.to_user_id,
+            message: newMessage.message,
+            created_at: newMessage.created_at,
+            sender: {
+              name: newMessage.from_user_id.name,
+              email: newMessage.from_user_id.email,
+              avatar: newMessage.from_user_id.photo_url
+            }
+          };
+
+          // Emit to all users in the swap chat room
+          this.io.to(`swap_${data.swapId}`).emit('new-message', messageData);
+          
+          console.log(`Message sent in swap ${data.swapId}:`, data.message);
+        } catch (error) {
+          console.error('Error sending message:', error);
+          socket.emit('message-error', { error: 'Failed to send message' });
         }
       });
 

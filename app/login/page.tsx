@@ -66,6 +66,7 @@ export default function LoginPage() {
         }),
       })
       console.log('Google user synced to backend:', user.email)
+      router.push('/browse')
     } catch (error) {
       console.error('Google login error:', error)
     }

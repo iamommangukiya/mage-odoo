@@ -28,18 +28,6 @@ export function useSocket() {
     // Handle connection
     socket.on('connect', () => {
       console.log('Connected to Socket.IO server');
-      
-      // Authenticate with user email
-      socket.emit('authenticate', { email: user.email });
-    });
-
-    // Handle authentication response
-    socket.on('authenticated', (data: { success: boolean; error?: string }) => {
-      if (data.success) {
-        console.log('Socket authenticated successfully');
-      } else {
-        console.error('Socket authentication failed:', data.error);
-      }
     });
 
     // Handle notifications

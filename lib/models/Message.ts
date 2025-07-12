@@ -5,6 +5,11 @@ const MessageSchema = new Schema({
   from_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
   to_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
   message: String,
+  status: { 
+    type: String, 
+    enum: ['sent', 'delivered', 'read'], 
+    default: 'sent' 
+  },
   created_at: { type: Date, default: Date.now },
 });
 
