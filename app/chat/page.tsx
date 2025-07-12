@@ -317,7 +317,7 @@ export default function ChatPage() {
 
       <div className="h-[calc(100vh-4rem)] flex">
         {/* Desktop Sidebar */}
-        <div className="hidden md:block w-80 border-r">
+        <div className=" border-r">
           <ChatSidebar />
         </div>
 

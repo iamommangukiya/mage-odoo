@@ -72,8 +72,8 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="container py-8 max-w-4xl">
-        <div className="space-y-8">
+      <div className=" py-8 ">
+        <div className="mx-auto p-5 space-y-8">
           {/* Back Button */}
           <Button variant="ghost" asChild className="mb-4">
             <Link href="/browse">

@@ -4,7 +4,7 @@ import { Github, Linkedin, Twitter, Heart } from "lucide-react"
 export function Footer() {
   return (
     <footer className="border-t bg-muted/50">
-      <div className="container py-12">
+      <div className=" py-12 px-[20px]">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-4">
             <div className="flex items-center space-x-2">

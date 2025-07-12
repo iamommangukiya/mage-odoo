@@ -169,7 +169,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="container py-8 max-w-6xl">
+      <div className="p-5 w-full">
         <div className="space-y-8">
           {/* Header */}
           <div>

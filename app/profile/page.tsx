@@ -101,7 +101,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="container py-8 max-w-4xl">
+      <div className=" py-8  flex justify-center items-center">
         <div className="space-y-8">
           {/* Header */}
           <div className="flex items-center justify-between">

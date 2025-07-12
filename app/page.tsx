@@ -75,17 +75,17 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+<div className=" flex flex-col gap-10 mx-auto">
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-secondary/10">
-        <div className="container py-24 lg:py-32">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8 animate-fade-in">
+      <section className="  bg-gradient-to-br from-primary/10 via-background to-secondary/10 ">
+        <div className=" mt-[100px] flex justify-center items-center  max-w-7xl mx-auto">
+          <div className="flex justify-center items-start">
+            <div className="space-y-8 animate-fade-in text-left">
               <div className="space-y-4">
-                <h1 className="text-4xl lg:text-6xl font-bold tracking-tight">
+                <h1 className="text-4xl lg:text-6xl font-bold tracking-tight text-left">
                   Exchange Skills, <span className="text-primary">Build Connections</span>
                 </h1>
-                <p className="text-xl text-muted-foreground max-w-lg">
+                <p className="text-xl text-muted-foreground max-w-lg text-left">
                   Connect with others to swap skills, learn together, and grow your expertise in a supportive community.
                 </p>
               </div>
@@ -114,7 +114,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="relative">
+            <div className="relative flex justify-start">
               <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-3xl blur-3xl"></div>
               <div className="relative">
                 <Image
@@ -164,7 +164,7 @@ export default function HomePage() {
 
       {/* Features Section */}
       <section className="py-24 bg-muted/50">
-        <div className="container">
+        <div className="  max-w-7xl mx-auto">
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold">Why Choose SkillSwap?</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -214,7 +214,7 @@ export default function HomePage() {
 
       {/* Featured Profiles Carousel */}
       <section className="py-24">
-        <div className="container">
+        <div className=" max-w-7xl mx-auto">
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold">Featured Skill Swappers</h2>
             <p className="text-xl text-muted-foreground">Meet some of our amazing community members</p>
@@ -325,7 +325,7 @@ export default function HomePage() {
             className="object-cover"
           />
         </div>
-        <div className="container text-center space-y-8 relative z-10">
+        <div className=" text-center space-y-8 relative z-10">
           <h2 className="text-3xl lg:text-4xl font-bold">Ready to Start Swapping Skills?</h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
             Join thousands of learners who are already exchanging skills and building meaningful connections.
@@ -345,6 +345,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+</div>
+      {/* Hero Section */}
 
       <Footer />
     </div>

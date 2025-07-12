@@ -145,7 +145,7 @@ export default function BrowsePage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="container py-8">
+      <div className=" py-8">
         <div className="space-y-8">
           {/* Header */}
           <div className="text-center space-y-4">
@@ -228,7 +228,7 @@ export default function BrowsePage() {
                   <CardHeader className="pb-4">
                     <div className="flex items-start space-x-4">
                       <Avatar className="h-16 w-16">
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} className="object-cover" />
                         <AvatarFallback>
                           {user.name
                             .split(" ")
